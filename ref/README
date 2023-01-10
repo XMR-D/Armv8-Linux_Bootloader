@@ -1,0 +1,113 @@
+| MAKEFILE RULES ////////////////////////////////////////////////////////////////
+
+make :  build the project and pflash.bin file
+
+make build :  build the project and pflash.bin file
+
+make run : build the project and pflash.bin =, then run the bootloader
+
+make clean : remove all unnecessary files
+
+
+| HOW TO BUILD THE REPO /////////////////////////////////////////////////////////
+
+WARN : Following steps must be done in my/pikaboot-guillaume.wantiez/ref
+WARN: The project is protected by password [ xxxRaccoonislove ]
+
+
+Steps to directly run the project:
+1 - execute on the Linux CLI : "make run" to run the project
+
+Steps to build the project:
+1 - check if thirdparty is correctly set up. 
+2 - execute on the Linux CLI : "make" or "make build" to build the project
+3 - execute on the Linux CLI : "qemu-system-aarch64 -nographic -machine virt -cpu cortex-a72 -kernel pflash.bin  -initrd thirdparty/initramfs.cpio.gz -serial mon:stdio -m 2G -smp 4"
+
+Steps to clean the repo:
+1 - execute on the Linux CLI : "make clean"
+
+| COMMAND SPEC //////////////////////////////////////////////////////////////////
+
+Commands available in the My_pikaboot CLI:
+
+Number of commands available : 5
+
+  boot : boot
+
+       Launch my_pikaboot kernel.
+
+  eboot : 
+
+       Place the bootloader in listening mode, in order to emergency boot,
+       to make it functionnal you need to execute the Emergency_boot.py
+       script in a shared environnement with a char device.
+
+
+  md : md [start_address] [range] [load_of_bytes]
+
+       Dump "load_nb bytes" of the memory starting at "start_address",
+       within a range of "range".
+
+       start_address : 64-bit hexadecimal unsigned int.
+       range : 64-bit unsigned int.
+       load_of_bytes : 64-bit unsigned int.
+
+  memtest : memtest [granularity] [start_address] [end_address]
+
+       test the cells of the memory starting at "start_address",
+       to "end_address", with a granularity of "granularity".
+
+       granularity : 64-bit unsigned int.
+       start_address : 64-bit hexadecimal unsigned int.
+       end_address : 64-bit hexadecimal unsigned int.
+
+  help : help
+
+       Display this help.
+
+
+
+
+
+
+| PROJECTLOG FILE ///////////////////////////////////////////////////////////////
+
+
+If you want to see my dev log read PROJECTLOG file, it contain all my researchs
+questions, experiences about the project. The file is divided into several weeks
+and weeks are divided on several days:
+
+For weeks search this pattern : WEEK X : TITLE.
+For days search this format : DAY X-Y (dd/mm/yy) : FEATURES|STEP|WORK.
+
+
+
+
+| DOCS USED AND CODES ////////////////////////////////////////////////////////////
+
+DOCS AND LINKS READ/USED FOR THE PROJECT (for now) (not in order) (don't know these by heart):
+
+https://developer.arm.com/
+https://developer.arm.com/documentation/ihi0014/q/Signal-Protocol-Overview/Definitions/Direct-branch-instructions
+https://docs.kernel.org/x86/boot.html
+https://docs.kernel.org/arm64/booting.html
+https://wiki.osdev.org/Expanded_Main_Page
+https://wiki.osdev.org/Object_Files
+https://wiki.osdev.org/Disk_Images
+https://wiki.osdev.org/CRC32
+https://elinux.org/images/f/f9/Petazzoni-device-tree-dummies_0.pdf
+https://blog.packagecloud.io/how-to-extract-and-disassmble-a-linux-kernel-image-vmlinuz/
+https://babbage.cs.qc.cuny.edu/courses/cs343/2003_02/UART.html
+http://nickdesaulniers.github.io/blog/2018/10/24/booting-a-custom-linux-kernel-in-qemu-and-debugging-it-with-gdb/
+
+EXTERN CODE USED AND READAPTED (number : 4)
+ 
+-> CRC32 :  https://wiki.osdev.org/CRC32 (examples function from os dev page on CRC32, basic CRC32 algortihm implement)
+
+-> RSA utilities : https://github.com/tsalomon/EmbeddedMontgomeryRSA (Open-src/bn.c Open-src/bn.h Open-src/RSA_Montgomery.c)
+
+-> SHA256 utilities : https://github.com/B-Con/crypto-algorithms (Open-src/sha256.c Open-src/sha256.h)
+
+-> AES utilities : https://github.com/openluopworld/aes_128/blob/master/aes.c (Open-src/aes.c  Open-src/aes.h)
+
+Thanks for reading !

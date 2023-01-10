@@ -1,0 +1,395 @@
+WEEK 1:
+
+
+DAY 1 (23/11/2022) : INTRO AND STARTING
+
+I start the project today (23/11/2022), first i need to gather some infos about
+what differ between a clasic 32-bit i387 kernel bootloader from a arch bootloader
+
+saw this doc : (1)  https://docs.kernel.org/arm64/booting.html seems usefull.
+
+started to read the first paragraph, 
+and encounter theses terms : EL0, EL3 ... refered as exceptions levels, oh boy
+what a start, i have no clue of what theses terms means, and they are the firsts
+technical terms, need to know what that means...
+
+read infos about exceptions level here : (2) https://developer.arm.com/documentation/102412/0102/Privilege-and-Exception-levels
+
+Exceptions levels are similar to rings in a kernel, on Armv8-A and Armv9-A
+theses are used to enable split between kernel-land and userland privilege,
+EL0 have less privilege than EL1 and so on...
+
+EL2 = hypervisor level,
+EL3 = highest prioritiy level
+they exist only on in secure mode.
+
+in the (1) doc they precise that the term bootloader is to define all softwares
+executed before control is passed to the kernel (duuuuuh i knew it)
+
+they say that the bootloader need to (as a minimum) :
+
+I- Setup and initialise the RAM
+II- Setup the device tree
+III- Decompress the kernel image
+IV- Call the kernel image
+
+SO
+
+Step 1 : Setup and initialise the Ram
+
+but if i remember well, we need to boot from a flash, so do we need to, i don't know,
+initialise the Flash or whatever...
+need to ask #daniel-dev...
+
+he said that i will see, and he want something that boot and without warnings...
+if he want something that boot then he will get it
+
+after reading for 1 hours: it seems that the first step is to set a protected mode
+seems easy enough need to enable A20, load a simple GDT and enter protected mode.
+a few seconds later daniel said that this steps is mandatory on x86 archs, im
+working on a more limited one so i were wrong.
+
+
+The pdf was released this afternoon, and it threw out all of my assumptions on were to start,
+
+got info on the first step to do :
+init the stack : already done (check into the link.ld and the entrypoint.S)
+now i need to implement kmain : done;
+
+and i started the driver for the UART device, found the base address (0x90000000)
+using the dtdump option on qemu and reading some doc online,
+
+now i just need to setup the registers i want to work with into a memory layout structure
+and i will be able to send and receive data from here. (created serial.c serial.h)
+
+ok first implem work so im really happy, hello word on output done now i need to do the input
+
+
+
+DAY 2 (24/11/2022) : INPUT IMPLEMENTATION
+
+So today i need to properly get a char from the serial and then create a basic CLI
+a Command line interface,
+
+I first thought that i will simply need to get the char form the uart data register
+but it was not that easy, i had to check the uart flag register to see if the fifo was empty
+and poll on it, after that it was not working due to a error in my global variables
+initialization, i initialized my uart data register at 0x9000000 and my uart flag register at
+0x9000000 + 0x018, i fixed the error by changing uart flag register at 0x90000018
+
+i added a wait_unbusy() function that wait for the fifo to be available in order to get a
+stable environement.
+
+and finally after a last tiny function to properly get and print it works fine.
+
+
+
+
+
+
+
+
+DAY 3 (25/11/2022) : LINUX KERNEL BOOT
+
+Today i started the core of the core feature : booting the kernel, i had no idea 
+on how to properly set up this so i thought i will ask daniel or another lse system
+staff member.
+
+daniel redirect me to the (1) doc,
+and ask me this simple question : what will happen if my device tree is no longer 
+available in my kernel ? 
+
+well short response : it will make the kernel completly fucked up.
+
+and without further ado he left,
+
+so step 1 2 and 3 (setup and init the ram, setup the device tree and decompress the krnel image)
+are done, in fact with just a few check on the given files, I saw that only step 4
+is left.
+
+SOOOOOO STEP 4 : Call the kernel Image
+
+thanks to du -h (disk usage command) I saw that the Image kernel takes 35MB in
+mem so i needed first a place to put this into ram (i will not put everything i think)
+
+then i needed a struct like in the doc :
+NOTES FROM DOC ON BOOTING (1)
+
+  u32 code0;			/* Executable code */
+  u32 code1;			/* Executable code */
+  u64 text_offset;		/* Image load offset, little endian */
+  u64 image_size;		/* Effective Image size, little endian */
+  u64 flags;			/* kernel flags, little endian */
+  u64 res2	= 0;		/* reserved */
+  u64 res3	= 0;		/* reserved */
+  u64 res4	= 0;		/* reserved */
+  u32 magic	= 0x644d5241;	/* Magic number, little endian, "ARM\x64" */
+  u32 res5;			/* reserved (used for PE COFF offset) */
+
+FAIR WARNING : 2MB ALIGNED ZONE, POSSIBLE HARDCODE AHEAD !!!!!!!!!!!!!!!
+
+image must be placed text_offset bytes from a base adress anyware in kernel (2MB ALIGNED)
+image_size bytes must be available at this base address
+
+if an initrd/initramfs is passed to the kernel at boot, it must be in a 1GB 
+aligned zone window of up to 32 GB in size
+and it must fully covers the kernel Image as well
+
+any mem described to the kernel is considered free if not specified as reserved
+by the kernel itself
+
+and conditions to met before jumping right into kernel
+
+1 - quiesce all DMA devices (ARM code)
+
+2 - CPU settings to have    (ARM code)
+
+  x0 = physical address of device tree blob (dtb) in system RAM.
+  x1 = 0 (reserved for future use)
+  x2 = 0 (reserved for future use)
+  x3 = 0 (reserved for future use)
+
+3- CPU mode
+  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
+  IRQ and FIQ).
+  The CPU must be in either EL2 (RECOMMENDED in order to have access to
+  the virtualisation extensions) or non-secure EL1.
+
+going to bed at 2:20 AM to have a fresh new look on the doc.
+
+4 - Caches, MMUs
+  MMU must be off.
+  The address range corresponding to the kernel image must be cleaned to the
+  Poc.  (todo : check Poc signification)
+
+Now with the help of the doc, and after a little chit-chat with daniel, i "realized"
+that a simple objdump can actually give to me all the info i need to boot the kernel
+i will need to hardcode a little but i think it will work.
+
+I finally found the offset, now if i put it in the x1 register and jump to it 
+it will be good.
+
+it's almost working, i create a boot() asm method, who load the x1 register correctly,
+that i call in kmain, but if i place a instruction before the call of boot() the
+registers are trashed and it just don't boot.
+
+After talking with vladimir (who had the same pb), we found the solution, in fact
+when calling instructions before booting it change x0 register who contain the dtb offset
+so all i need to do is to understand what type of register x0 is, and save the content
+of x0 at start and then restore it before booting.
+
+To do that, i re-read the doc and finally understand that x0-x7 are function argument 
+registers, so since the content of x0 don't change in our case between entrypoint and call of
+kmain, i just passed in the kmain prototype a int that will be the offset of the dtb
+stored, and when calling boot later i just have to pass it in the method like this:
+
+.
+.
+boot(dtb);
+
+And it work just FINE !!!! I BOOOTED IT !
+
+later this evening i successfully handle commands help and boot, 
+
+I implemented a static buffer but i really don't like it,
+it's not safe at all, buffer overflow attacks are simple,
+even me with limited background i already did it once on root me!!!
+
+But without memory allocator i can't do it.
+anyway it works fine, but i will probably need to refactor this later.
+
+
+
+
+
+
+
+
+
+
+DAY 5 (26/11/2022) : MEMDUMP CMD IMPLEMENTATIION
+
+
+The next step is the memory dump of the Image file, so since it's a command that
+takes parameters,
+i need a tiny parser to parse the arguments of the command line,
+a function to convert a string to a int ,
+a function to convert a string to a hex int,
+
+So let's start
+
+
+
+
+
+DAY 5-7 (28/11/2022) : PARSING HELL
+
+All you need is to read the title to understand,
+parsing memdump is awfull but i'll make it functional.
+it's not hard to understand it's just horrible to do. I stopped to count the number
+of time i refactrored this part to fit the specification, and it's just to much
+i can't find all the problems, and all my functions are slowly becoming gross.
+
+i almost got it, i just need to understand why my mem dump forgot sometimes a 0,
+I know it comes from my puthex function which use a padding_mode val i just need
+to figure it out before i can start the bytes-to-ascii (reminder : im in little endian).
+
+it taked me an hour to change all my functions so that they can solve the problem,
+
+basically i changed the behaviour of memory_dump_at, instead of doing the tasks
+separately (save the printables chars and put the corresponding bytes) wich use
+a lot of declaration and operations on values, i decided to do one calcul that 
+change one index and from this index i save the char if printable, 
+I also had the time to discard some unused code or unoptimized grabage.
+
+The memdump routine work now, I just need to pad the parameter address_range to
+the next 16 multiple and it will be perfect (lol no just more precise).
+
+To do that, i will implement a litle method into tools.c
+
+
+
+
+
+
+
+
+
+DAYS 7-10 (30/11/2022) : MEMORY TEST ROUTINE IMPLEM
+
+For this part i first search on internet what a memtest is, infact is just checking
+the bytes of the memory and see if it's writeable and readeable by flipping bytes
+or writing to them, they are severals algortihm to do that, and theses are the issues
+we can detect with algorithms:
+
+1. SAF Stuck-At Fault (The logic value of a cell or a line is always 0 or 1.)
+2. TF Transition Fault (A cell or a line that fails to undergo a 0->1 or a 1->0 transition.)
+3. CF Coupling Fault (A write operation to one cell changes the content of a second cell.)
+4. NPSF Neighborhood Pattern Sensitive Fault (the cell can be influenced by another)
+5. AF Address decoding fault (Any fault that affects address decoder)
+
+the more basic one is the MSCAN (aka zero-one algorithm),
+where we just put 0 onto the memory read it, then flip it by putting one
+into the cell and reread it,
+a simple one complement onto the memory area
+should do it.
+
+Pros and cons :
+++ simple to implement
+++ fast operations
+++ found basics issues onto memory.
+
+-- Do not catch any CF or AF
+-- complexity of (n); (butterfly are (nlog(n))
+
+there's an other one wich is called the checkerboard
+here we put 0 and 1 onto the memory in a specific order :
+
+[0|1|0|1|0|1|0|1] (8 bit)
+
+     or
+
+[1|0|1|0|1|0|1|0] (8 bit)
+
+we read from the memory, flip all bits and then reread it,
+
+it's praticly the same thing, and honestly i don't really understand the difference
+but i assume you execute less operations on memory like this thus you gain time
+and it's less complex.
+I will try to implement it. (EDIT. i switched to the first)
+
+after one day i have a first version of the code, but it stops at 1% saying that
+the first cell is fault and then abort........... at least the aborting phase work
+
+after porting my code into a debug environement (see debug/ folder), i tested it,
+and of course my code broke because of a memory access denial when i get the pointer
+from the offset into memory.
+
+i don't know why this f*** pointer is not accessible, it's pointing to a valid
+cell !!!! aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaargggggggggggggggggggggggggggg.
+let's do some research on pointers to memory in C
+
+ok, im so dumb, 15 min after updating the log i just realized that the environement
+is NOT THE SAME, so im trying to access a wrong address, the linker file is not loaded
+so the memory is not the same and i don't compile my test_mem file.
+
+I successfully fixed some bugs but there's one remaining that i don't understand
+on addresses 0x3efffff8 to 0x3effffff my routine fail and crash, i rechecked and i think
+it come from when im swapping beetween writable and not writeable, i try to debug it
+for 2 days now, but im really struggling, i have to retry, it must come from 
+this moment i just know it.
+
+I asked daniel to check my code and he said that it was good so i consider this part done
+
+
+
+
+
+DAY 11 (03/12/2022) : CRC32 CHECK IMPLEM AND RESEARCH ON KERLIT PROTOCOL
+
+So for this part if i understand it good, you have to create a hash of the image file
+with the crc32 algorithm and check it at starting with another hash from the same algorithm
+created from a valid image file, thus it chek the integrity of the file we boot on.
+
+Seem quite simple.
+
+After one hour of searching i stumble across the Os dev page on the CRC32 algorithm
+and the site was providing a C code of the algorithm
+
+Since taking code from internet is not forbidden unless you don't specify the source
+I taked it and it do the job quite nicely
+
+just need to calculate the number of bytes of the file, i used vscode to do this
+via a hex dump, and after a little li king to the other sources files, it work
+perfectly. and it take me just 2 hours, so BONUS +1 !
+
+
+
+
+
+DAY 14 (06/12/2022)
+
+Daniel said to me that image size must no be hardcoded so i need to get the info from something
+and after 2 days of thinking and a lot of help from daniel,
+I found the solution : create a python script to put a header in my elf
+to get info on the image file and the CRC32 and then i need to acces it in C, the only issue is to
+place the infos at the right address and get the info from the right address, it's somewhat complicated
+because i need to fully understand my architectures 
+
+SEARCH NOTES:
+
+START of pikaboot string at addr 0x40081920 (using memdump in bootloader)
+(vscode) START of pikaboot string in my_bootloader.elf file 0x11920
+
+So i need to place it into my elf file just before it is compiled to make the pflash.bin
+and at 65536 bytes after the start.
+
+
+
+
+
+DAY 14-24 (06/12/2022): Header implem + Emergency boot implem + Signature implem
+
+The header and emergency boot was not hard to implem, it just took time to do it, and to debug it,
+
+For the Signature implem i had to add some infos in my header about a rsa encryption and a sha256 hash,
+i searched for about 1 week a lib on RSA and SHA256 and it took me 3 days to port them onto my project
+now it works well, thanks to 
+
+lib RSA used : https://github.com/tsalomon/EmbeddedMontgomeryRSA
+lib SHA256 used : https://github.com/B-Con/crypto-algorithms
+
+
+
+
+
+DAY 24-30 (16/12/2022 - 22/12/2022): Gotta go fast / pflashbin enctyption
+
+-> AES utilities : https://github.com/openluopworld/aes_128/blob/master/aes.c (Open-src/aes.c  Open-src/aes.h)
+
+For gotta go fast : i just solved bugs as i increased the compilo optimization, and activated neon, now it run well with -Ofast
+
+For aes pflash encryption : i nearly lost my project and add to revert some change to keep the project integrity but manage to recode it from scratch faster
+
+
+END OF PROJECT!
