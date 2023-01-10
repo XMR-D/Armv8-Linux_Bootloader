@@ -41,6 +41,13 @@ Number of commands available : 5
        Place the bootloader in listening mode, in order to emergency boot,
        to make it functionnal you need to execute the Emergency_boot.py
        script in a shared environnement with a char device.
+       
+       The script will ask you wich char device you used, (so you need to place
+       the bootloader into listening mode into the same as the one you specify
+       during the script).
+       
+       Enter the path of the char device (usually : /dev/pts/"number") then wait
+       for the script to send all the bytes. then reopen the bootloader.
 
 
   md : md [start_address] [range] [load_of_bytes]
