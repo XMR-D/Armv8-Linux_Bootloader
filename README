@@ -1,4 +1,4 @@
-| MAKEFILE RULES ////////////////////////////////////////////////////////////////
+| MAKEFILE RULES (Makefile in /ref) ////////////////////////////////////////////////////////////////
 
 make :  build the project and pflash.bin file
 
@@ -11,8 +11,9 @@ make clean : remove all unnecessary files
 
 | HOW TO BUILD THE REPO /////////////////////////////////////////////////////////
 
-WARN : Following steps must be done in my/pikaboot-guillaume.wantiez/ref
-WARN: The project is protected by password [ xxxRaccoonislove ]
+WARN : Following steps must be done in /ref
+WARN : The project is protected by password [ xxxRaccoonislove ]
+WARN : Make clean if you want to rebuild or rerun (do not execute steps 2 times in a row)
 
 
 Steps to directly run the project:
@@ -21,7 +22,6 @@ Steps to directly run the project:
 Steps to build the project:
 1 - check if thirdparty is correctly set up. 
 2 - execute on the Linux CLI : "make" or "make build" to build the project
-3 - execute on the Linux CLI : "qemu-system-aarch64 -nographic -machine virt -cpu cortex-a72 -kernel pflash.bin  -initrd thirdparty/initramfs.cpio.gz -serial mon:stdio -m 2G -smp 4"
 
 Steps to clean the repo:
 1 - execute on the Linux CLI : "make clean"
